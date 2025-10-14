@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Play Scraper</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+            padding: 20px;
+        }
+
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .subtitle {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .search-box {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            margin-bottom: 30px;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        input {
+            flex: 1;
+            padding: 15px 20px;
+            font-size: 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            transition: all 0.3s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        button {
+            padding: 15px 40px;
+            font-size: 16px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .example-apps {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .example-btn {
+            padding: 8px 15px;
+            font-size: 14px;
+            background: #f0f0f0;
+            color: #333;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .example-btn:hover {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            display: none;
+        }
+
+        .spinner {
+            border: 4px solid rgba(255,255,255,0.3);
+            border-top: 4px solid white;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error {
+            background: #ff4444;
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .result {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            display: none;
+        }
+
+        .app-header {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 30px;
+            align-items: start;
+        }
+
+        .app-icon {
+            width: 100px;
+            height: 100px;
+            border-radius: 20px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        }
+
+        .app-info h2 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2em;
+        }
+
+        .app-developer {
+            color: #666;
+            font-size: 1.1em;
+            margin-bottom: 5px;
+        }
+
+        .app-genre {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            opacity: 0.9;
+            margin-bottom: 5px;
+        }
+
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+        }
+
+        .summary {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+            line-height: 1.6;
+            color: #555;
+        }
+
+        .api-url {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+        }
+
+        .api-url h3 {
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .api-url input {
+            width: 100%;
+            padding: 10px;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-family: monospace;
+        }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2em;
+            }
+
+            .app-header {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .input-group {
+                flex-direction: column;
+            }
+
+            button {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔍 Google Play Scraper</h1>
+            <p class="subtitle">Analysez n'importe quelle application Android</p>
+        </header>
+
+        <div class="search-box">
+            <div class="input-group">
+                <input 
+                    type="text" 
+                    id="appIdInput" 
+                    placeholder="Entrez l'ID de l'app (ex: com.whatsapp)"
+                    value="com.whatsapp"
+                />
+                <button id="searchBtn" onclick="searchApp()">Rechercher</button>
+            </div>
+            
+            <div class="example-apps">
+                <span style="color: #666; margin-right: 10px;">Exemples :</span>
+                <button class="example-btn" onclick="setAppId('com.whatsapp')">WhatsApp</button>
+                <button class="example-btn" onclick="setAppId('com.instagram.android')">Instagram</button>
+                <button class="example-btn" onclick="setAppId('com.zhiliaoapp.musically')">TikTok</button>
+                <button class="example-btn" onclick="setAppId('org.telegram.messenger')">Telegram</button>
+                <button class="example-btn" onclick="setAppId('com.snapchat.android')">Snapchat</button>
+            </div>
+        </div>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p style="color: white; font-size: 1.2em;">Analyse en cours...</p>
+        </div>
+
+        <div class="error" id="error"></div>
+
+        <div class="result" id="result">
+            <div class="app-header">
+                <img id="appIcon" class="app-icon" src="" alt="App Icon">
+                <div class="app-info">
+                    <h2 id="appTitle"></h2>
+                    <p class="app-developer" id="appDeveloper"></p>
+                    <span class="app-genre" id="appGenre"></span>
+                </div>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">Note</div>
+                    <div class="stat-value" id="appScore">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Avis</div>
+                    <div class="stat-value" id="appRatings">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Installations</div>
+                    <div class="stat-value" id="appInstalls">-</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Prix</div>
+                    <div class="stat-value" id="appPrice">-</div>
+                </div>
+            </div>
+
+            <div class="summary">
+                <strong>Résumé :</strong>
+                <p id="appSummary"></p>
+            </div>
+
+            <div class="api-url">
+                <h3>📋 URL de l'API utilisée :</h3>
+                <input type="text" id="apiUrlUsed" readonly onclick="this.select()">
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ⚠️ REMPLACE CETTE URL PAR TON URL RENDER !
+        const API_URL = 'https://gplay-scraper-backend.onrender.com';
+        
+        function setAppId(appId) {
+            document.getElementById('appIdInput').value = appId;
+        }
+
+        async function searchApp() {
+            const appId = document.getElementById('appIdInput').value.trim();
+            
+            if (!appId) {
+                showError('Veuillez entrer un ID d\'application');
+                return;
+            }
+
+            // Réinitialiser l'affichage
+            document.getElementById('result').style.display = 'none';
+            document.getElementById('error').style.display = 'none';
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('searchBtn').disabled = true;
+
+            try {
+                const response = await fetch(`${API_URL}/api/search/${appId}`);
+                const result = await response.json();
+
+                if (!response.ok || !result.success) {
+                    throw new Error(result.error || 'Erreur lors de la recherche');
+                }
+
+                displayResult(result.data, appId);
+            } catch (error) {
+                showError(error.message);
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('searchBtn').disabled = false;
+            }
+        }
+
+        function displayResult(data, appId) {
+            // Afficher l'icône
+            document.getElementById('appIcon').src = data.icon || '';
+            
+            // Informations principales
+            document.getElementById('appTitle').textContent = data.title || 'N/A';
+            document.getElementById('appDeveloper').textContent = data.developer || 'N/A';
+            document.getElementById('appGenre').textContent = data.genre || 'N/A';
+            
+            // Statistiques
+            document.getElementById('appScore').textContent = data.score ? data.score.toFixed(1) + ' ⭐' : 'N/A';
+            document.getElementById('appRatings').textContent = data.ratings ? formatNumber(data.ratings) : 'N/A';
+            document.getElementById('appInstalls').textContent = data.installs || 'N/A';
+            document.getElementById('appPrice').textContent = data.free ? 'Gratuit' : `$${data.price}`;
+            
+            // Résumé
+            document.getElementById('appSummary').textContent = data.summary || 'Aucun résumé disponible';
+            
+            // URL de l'API
+            document.getElementById('apiUrlUsed').value = `${API_URL}/api/search/${appId}`;
+            
+            // Afficher le résultat
+            document.getElementById('result').style.display = 'block';
+            
+            // Scroll vers le résultat
+            document.getElementById('result').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = '❌ ' + message;
+            errorDiv.style.display = 'block';
+            setTimeout(() => {
+                errorDiv.style.display = 'none';
+            }, 5000);
+        }
+
+        function formatNumber(num) {
+            if (num >= 1000000) {
+                return (num / 1000000).toFixed(1) + 'M';
+            } else if (num >= 1000) {
+                return (num / 1000).toFixed(1) + 'K';
+            }
+            return num.toString();
+        }
+
+        // Permettre la recherche avec la touche Entrée
+        document.getElementById('appIdInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                searchApp();
+            }
+        });
+    </script>
+</body>
+</html>
