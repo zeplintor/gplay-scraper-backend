@@ -7,7 +7,7 @@
       "expires_at": null,
       "status": "active",
       "plan": "premium",
-      "notes": "Clé de test pour démonstration"
+      "notes": "Cl\u00e9 de test pour d\u00e9monstration"
     },
     {
       "key": "PSAP-DEMO-FREE-TRIAL-XYZ",
@@ -16,7 +16,7 @@
       "expires_at": "2026-10-15T11:00:00Z",
       "status": "active",
       "plan": "premium",
-      "notes": "Clé de test avec expiration"
+      "notes": "Cl\u00e9 de test avec expiration"
     },
     {
       "key": "PSAP-PROD-LIVE-FULL-ABC",
@@ -52,7 +52,7 @@
       "expires_at": null,
       "status": "revoked",
       "plan": "premium",
-      "notes": "Licence révoquée pour test"
+      "notes": "Licence r\u00e9voqu\u00e9e pour test"
     },
     {
       "key": "PSAP-EXPIRED-OLD-KEY-ABC",
@@ -61,7 +61,7 @@
       "expires_at": "2025-01-01T00:00:00Z",
       "status": "active",
       "plan": "premium",
-      "notes": "Licence expirée pour test"
+      "notes": "Licence expir\u00e9e pour test"
     }
   ]
 }
