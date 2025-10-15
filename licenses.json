@@ -1,0 +1,67 @@
+{
+  "licenses": [
+    {
+      "key": "PSAP-TEST-2025-DEMO-KEY1",
+      "email": "demo@playstore-analytics.pro",
+      "created_at": "2025-10-15T10:00:00Z",
+      "expires_at": null,
+      "status": "active",
+      "plan": "premium",
+      "notes": "Clé de test pour démonstration"
+    },
+    {
+      "key": "PSAP-DEMO-FREE-TRIAL-XYZ",
+      "email": "trial@playstore-analytics.pro",
+      "created_at": "2025-10-15T11:00:00Z",
+      "expires_at": "2026-10-15T11:00:00Z",
+      "status": "active",
+      "plan": "premium",
+      "notes": "Clé de test avec expiration"
+    },
+    {
+      "key": "PSAP-PROD-LIVE-FULL-ABC",
+      "email": "client1@example.com",
+      "created_at": "2025-10-01T14:30:00Z",
+      "expires_at": null,
+      "status": "active",
+      "plan": "premium",
+      "notes": "Client premium actif"
+    },
+    {
+      "key": "PSAP-GOLD-USER-PREM-123",
+      "email": "golduser@example.com",
+      "created_at": "2025-09-20T09:00:00Z",
+      "expires_at": null,
+      "status": "active",
+      "plan": "premium",
+      "notes": "Utilisateur gold"
+    },
+    {
+      "key": "PSAP-ULTRA-MEGA-SUPER-XYZ",
+      "email": "vip@example.com",
+      "created_at": "2025-08-15T16:45:00Z",
+      "expires_at": null,
+      "status": "active",
+      "plan": "premium",
+      "notes": "VIP lifetime"
+    },
+    {
+      "key": "PSAP-REVOKED-TEST-CANCEL",
+      "email": "revoked@example.com",
+      "created_at": "2025-07-01T10:00:00Z",
+      "expires_at": null,
+      "status": "revoked",
+      "plan": "premium",
+      "notes": "Licence révoquée pour test"
+    },
+    {
+      "key": "PSAP-EXPIRED-OLD-KEY-ABC",
+      "email": "expired@example.com",
+      "created_at": "2024-01-01T00:00:00Z",
+      "expires_at": "2025-01-01T00:00:00Z",
+      "status": "active",
+      "plan": "premium",
+      "notes": "Licence expirée pour test"
+    }
+  ]
+}
