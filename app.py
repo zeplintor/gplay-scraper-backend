@@ -2,6 +2,8 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 from gplay_scraper import GPlayScraper
 import logging
+import json
+from datetime import datetime
 
 app = Flask(__name__)
 CORS(app)  # Permet les requêtes depuis Netlify
@@ -185,6 +187,91 @@ def internal_error(error):
         "success": False,
         "error": "Internal server error"
     }), 500
+
+
+def load_licenses():
+    """
+    Charge les licences depuis le fichier licenses.json.
+    Retourne une liste de licences ou une liste vide en cas d'erreur.
+    """
+    try:
+        with open('licenses.json', 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            return data.get('licenses', [])
+    except Exception:
+        return []
+
+
+def is_license_expired(expires_at):
+    """
+    Vérifie si une licence est expirée à partir de sa date ISO.
+    """
+    if not expires_at:
+        return False
+    try:
+        exp_date = datetime.fromisoformat(expires_at.replace('Z', '+00:00'))
+        return exp_date < datetime.now(exp_date.tzinfo)
+    except Exception:
+        return False
+
+
+@app.route('/api/validate-license', methods=['POST', 'OPTIONS'])
+def validate_license():
+    """
+    Endpoint de validation des licences.
+    """
+    if request.method == 'OPTIONS':
+        return '', 204
+
+    data = request.get_json() or {}
+    key = data.get('key', '').strip().upper()
+
+    if not key:
+        return jsonify({
+            'success': False,
+            'valid': False,
+            'message': 'Clé requise'
+        }), 400
+
+    licenses = load_licenses()
+    license_found = next(
+        (lic for lic in licenses if lic.get('key', '').upper() == key),
+        None
+    )
+
+    if not license_found:
+        return jsonify({
+            'success': True,
+            'valid': False,
+            'message': 'Clé invalide'
+        })
+
+    if license_found.get('status') != 'active':
+        return jsonify({
+            'success': True,
+            'valid': False,
+            'message': f"Licence {license_found.get('status')}"
+        })
+
+    if is_license_expired(license_found.get('expires_at')):
+        return jsonify({
+            'success': True,
+            'valid': False,
+            'message': 'Licence expirée'
+        })
+
+    return jsonify({
+        'success': True,
+        'valid': True,
+        'message': 'Licence valide',
+        'data': {
+            'email': license_found.get('email'),
+            'created_at': license_found.get('created_at'),
+            'expires_at': license_found.get('expires_at'),
+            'plan': license_found.get('plan', 'premium')
+        }
+    })
+
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
