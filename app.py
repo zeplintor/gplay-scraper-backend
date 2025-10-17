@@ -336,33 +336,82 @@ def save_license_to_file(license_key, email, plan='premium'):
 
 
 def send_license_email(email, license_key):
-    """Envoie un email avec la clé de licence (actuellement log seulement)"""
-    email_body = f"""
-Bonjour,
+    """Envoie un email avec la clé de licence via SendGrid"""
 
-Merci d'avoir acheté PlayStore Analytics Pro Premium !
+    # Si SendGrid est configuré, envoyer un vrai email
+    sendgrid_api_key = os.getenv('SENDGRID_API_KEY')
 
-Voici votre clé de licence :
+    if sendgrid_api_key:
+        try:
+            from sendgrid import SendGridAPIClient
+            from sendgrid.helpers.mail import Mail
 
-{license_key}
+            html_content = f"""
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+                <div style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); padding: 30px; border-radius: 12px 12px 0 0;">
+                    <h1 style="color: white; margin: 0; font-size: 28px;">PlayStore Analytics Pro</h1>
+                </div>
+                <div style="background: white; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 12px 12px;">
+                    <h2 style="color: #111827; margin-top: 0;">Merci pour votre achat ! 🎉</h2>
+                    <p style="color: #6b7280; font-size: 16px; line-height: 1.6;">
+                        Votre licence Premium a été activée avec succès. Voici votre clé de licence :
+                    </p>
+                    <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 25px 0; text-align: center;">
+                        <code style="font-size: 20px; font-weight: bold; color: #6366f1; font-family: monospace; letter-spacing: 1px;">
+                            {license_key}
+                        </code>
+                    </div>
+                    <h3 style="color: #111827; font-size: 18px; margin-top: 30px;">Pour activer votre licence :</h3>
+                    <ol style="color: #6b7280; line-height: 1.8; padding-left: 20px;">
+                        <li>Rendez-vous sur <a href="{FRONTEND_URL}/premium.html" style="color: #6366f1; text-decoration: none; font-weight: 600;">votre dashboard</a></li>
+                        <li>Cliquez sur "Gérer la licence"</li>
+                        <li>Entrez votre clé de licence</li>
+                        <li>Profitez de toutes les fonctionnalités Premium !</li>
+                    </ol>
+                    <div style="background: #eff6ff; border-left: 4px solid #6366f1; padding: 15px; margin: 25px 0; border-radius: 4px;">
+                        <p style="margin: 0; color: #1e40af; font-size: 14px;">
+                            <strong>💡 Astuce :</strong> Conservez cet email précieusement. Vous pouvez réutiliser cette clé sur plusieurs appareils.
+                        </p>
+                    </div>
+                    <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
+                    <p style="color: #9ca3af; font-size: 14px; line-height: 1.6;">
+                        Besoin d'aide ? Répondez simplement à cet email ou contactez-nous à
+                        <a href="mailto:hello@playstore-analytics.pro" style="color: #6366f1; text-decoration: none;">hello@playstore-analytics.pro</a>
+                    </p>
+                    <p style="color: #9ca3af; font-size: 12px; margin-top: 20px;">
+                        L'équipe PlayStore Analytics Pro
+                    </p>
+                </div>
+            </div>
+            """
 
-Pour l'activer :
-1. Rendez-vous sur {FRONTEND_URL}/premium.html
-2. Cliquez sur "Gérer la licence"
-3. Entrez votre clé de licence
-4. Profitez de toutes les fonctionnalités Premium !
+            message = Mail(
+                from_email='noreply@playstore-analytics.pro',
+                to_emails=email,
+                subject='🎉 Votre licence PlayStore Analytics Pro Premium',
+                html_content=html_content
+            )
 
-Besoin d'aide ? Contactez-nous à hello@playstore-analytics.pro
+            sg = SendGridAPIClient(sendgrid_api_key)
+            response = sg.send(message)
 
-L'équipe PlayStore Analytics Pro
-    """
+            logger.info(f"✅ Email sent successfully to {email} (status: {response.status_code})")
+            return True
 
-    logger.info(f"EMAIL TO SEND to {email}:")
-    logger.info(f"Subject: Votre licence PlayStore Analytics Pro Premium")
-    logger.info(email_body)
+        except Exception as e:
+            logger.error(f"❌ Error sending email via SendGrid: {str(e)}")
+            # Fallback : logger l'email
+            logger.info(f"📧 EMAIL FALLBACK for {email}: License key = {license_key}")
+            return False
 
-    # TODO: Intégrer SendGrid ou SMTP pour envoi réel d'email
-    return True
+    else:
+        # Pas de SendGrid configuré, juste logger
+        logger.info(f"📧 EMAIL TO SEND to {email}:")
+        logger.info(f"Subject: Votre licence PlayStore Analytics Pro Premium")
+        logger.info(f"License Key: {license_key}")
+        logger.info(f"Activation URL: {FRONTEND_URL}/premium.html")
+        logger.info("⚠️ SendGrid not configured. Add SENDGRID_API_KEY to enable email sending.")
+        return True
 
 
 @app.route('/api/create-checkout', methods=['POST'])
