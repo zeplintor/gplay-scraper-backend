@@ -385,8 +385,11 @@ def send_license_email(email, license_key):
             </div>
             """
 
+            # Utilise l'email vérifié dans SendGrid
+            from_email = os.getenv('SENDGRID_FROM_EMAIL', 'noreply@playstore-analytics.pro')
+
             message = Mail(
-                from_email='noreply@playstore-analytics.pro',
+                from_email=from_email,
                 to_emails=email,
                 subject='🎉 Votre licence PlayStore Analytics Pro Premium',
                 html_content=html_content
