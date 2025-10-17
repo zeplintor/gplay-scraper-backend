@@ -424,7 +424,7 @@ def stripe_webhook():
     except ValueError as e:
         logger.error(f"Invalid payload: {str(e)}")
         return jsonify({'error': 'Invalid payload'}), 400
-    except stripe.error.SignatureVerificationError as e:
+    except Exception as e:
         logger.error(f"Invalid signature: {str(e)}")
         return jsonify({'error': 'Invalid signature'}), 400
 
