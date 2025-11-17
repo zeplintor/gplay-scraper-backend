@@ -4,9 +4,18 @@ from gplay_scraper import GPlayScraper
 import logging
 import json
 from datetime import datetime
+import os
+from dotenv import load_dotenv
+
+# Charger les variables d'environnement
+load_dotenv()
 
 app = Flask(__name__)
-CORS(app)  # Permet les requêtes depuis Netlify
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
+
+# Configuration CORS sécurisée
+allowed_origins = os.getenv('ALLOWED_ORIGINS', '*').split(',')
+CORS(app, origins=allowed_origins)
 
 # Configuration du logging
 logging.basicConfig(level=logging.INFO)
@@ -195,10 +204,12 @@ def load_licenses():
     Retourne une liste de licences ou une liste vide en cas d'erreur.
     """
     try:
-        with open('licenses.json', 'r', encoding='utf-8') as f:
+        license_file = os.getenv('LICENSE_FILE_PATH', 'licenses.json')
+        with open(license_file, 'r', encoding='utf-8') as f:
             data = json.load(f)
             return data.get('licenses', [])
-    except Exception:
+    except Exception as e:
+        logger.error(f"Error loading licenses: {str(e)}")
         return []
 
 
@@ -273,5 +284,96 @@ def validate_license():
     })
 
 
+@app.route('/api/create-checkout', methods=['POST', 'OPTIONS'])
+def create_checkout():
+    """
+    Crée une session Stripe Checkout pour acheter une licence Premium
+    """
+    if request.method == 'OPTIONS':
+        return '', 204
+
+    try:
+        import stripe
+        stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
+
+        data = request.get_json()
+        email = data.get('email', '')
+
+        # Créer une session Checkout
+        checkout_session = stripe.checkout.Session.create(
+            payment_method_types=['card'],
+            line_items=[{
+                'price_data': {
+                    'currency': 'eur',
+                    'product_data': {
+                        'name': 'PlayStore Analytics Pro - Licence Premium',
+                        'description': 'Analyses illimitées à vie + Exports PDF + 65+ métriques avancées',
+                        'images': ['https://playstore-analytics.pro/assets/og-image.jpg'],
+                    },
+                    'unit_amount': 999,  # 9.99 EUR en centimes
+                },
+                'quantity': 1,
+            }],
+            mode='payment',
+            success_url=os.getenv('SUCCESS_URL', 'https://playstore-analytics.pro/success.html') + '?session_id={CHECKOUT_SESSION_ID}',
+            cancel_url=os.getenv('CANCEL_URL', 'https://playstore-analytics.pro/pricing.html'),
+            customer_email=email,
+            metadata={
+                'product': 'premium_license',
+                'email': email
+            }
+        )
+
+        return jsonify({
+            'success': True,
+            'sessionId': checkout_session.id,
+            'url': checkout_session.url
+        })
+
+    except Exception as e:
+        logger.error(f"Error creating checkout session: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 400
+
+
+@app.route('/api/webhook/stripe', methods=['POST'])
+def stripe_webhook():
+    """
+    Webhook pour recevoir les événements Stripe (paiements réussis, etc.)
+    """
+    try:
+        import stripe
+        stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
+
+        payload = request.data
+        sig_header = request.headers.get('Stripe-Signature')
+        webhook_secret = os.getenv('STRIPE_WEBHOOK_SECRET')
+
+        event = stripe.Webhook.construct_event(
+            payload, sig_header, webhook_secret
+        )
+
+        # Gérer l'événement de paiement réussi
+        if event['type'] == 'checkout.session.completed':
+            session = event['data']['object']
+
+            # Créer automatiquement une licence
+            email = session.get('customer_email')
+            if email:
+                # TODO: Implémenter la création automatique de licence
+                logger.info(f"Payment successful for {email}")
+                # Vous pouvez envoyer un email avec la clé de licence ici
+
+        return jsonify({'success': True})
+
+    except Exception as e:
+        logger.error(f"Webhook error: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    port = int(os.getenv('PORT', 5000))
+    debug = os.getenv('FLASK_DEBUG', 'False') == 'True'
+    app.run(debug=debug, host='0.0.0.0', port=port)
