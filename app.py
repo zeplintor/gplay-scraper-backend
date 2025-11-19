@@ -347,6 +347,41 @@ def create_checkout():
         }), 400
 
 
+@app.route('/api/checkout-status/<session_id>', methods=['GET'])
+def get_checkout_status(session_id):
+    """
+    Récupère les informations d'une session Stripe Checkout après paiement
+    """
+    try:
+        import stripe
+        stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
+
+        session = stripe.checkout.Session.retrieve(session_id)
+        amount_total = (session.amount_total or 0) / 100  # Stripe renvoie en centimes
+        currency = (session.currency or 'eur').upper()
+
+        customer_email = session.customer_email
+        customer_details = getattr(session, 'customer_details', None)
+        if not customer_email and customer_details:
+            customer_email = customer_details.get('email')
+
+        return jsonify({
+            'success': True,
+            'session_id': session.id,
+            'status': session.payment_status,
+            'amount_total': amount_total,
+            'currency': currency,
+            'customer_email': customer_email,
+        })
+
+    except Exception as e:
+        logger.error(f"Error retrieving checkout session {session_id}: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': 'Session introuvable'
+        }), 400
+
+
 @app.route('/api/webhook/stripe', methods=['POST'])
 def stripe_webhook():
     """
