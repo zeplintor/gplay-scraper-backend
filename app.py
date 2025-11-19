@@ -14,8 +14,17 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
 
 # Configuration CORS sécurisée
-allowed_origins = os.getenv('ALLOWED_ORIGINS', '*').split(',')
-CORS(app, origins=allowed_origins)
+allowed_origins_str = os.getenv('ALLOWED_ORIGINS', '*')
+if allowed_origins_str == '*':
+    allowed_origins = '*'
+else:
+    allowed_origins = [origin.strip() for origin in allowed_origins_str.split(',')]
+
+CORS(app,
+     resources={r"/api/*": {"origins": allowed_origins}},
+     allow_headers=["Content-Type", "Authorization"],
+     methods=["GET", "POST", "OPTIONS"],
+     supports_credentials=True)
 
 # Configuration du logging
 logging.basicConfig(level=logging.INFO)
