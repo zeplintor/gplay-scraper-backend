@@ -5,6 +5,7 @@ import logging
 import json
 from datetime import datetime
 import os
+import secrets
 from dotenv import load_dotenv
 
 # Charger les variables d'environnement
@@ -32,6 +33,12 @@ logger = logging.getLogger(__name__)
 
 # Initialiser le scraper
 scraper = GPlayScraper()
+
+# Configuration globale
+LICENSE_FILE_PATH = os.getenv('LICENSE_FILE_PATH', 'licenses.json')
+SENDGRID_API_KEY = os.getenv('SENDGRID_API_KEY')
+SENDGRID_FROM_EMAIL = os.getenv('SENDGRID_FROM_EMAIL', 'hello@playstore-analytics.pro')
+SENDGRID_FROM_NAME = os.getenv('SENDGRID_FROM_NAME', 'PlayStore Analytics Pro')
 
 @app.route('/', methods=['GET'])
 def home():
@@ -117,6 +124,18 @@ def search_app(app_id):
             "success": False,
             "error": str(e)
         }), 400
+
+
+@app.route('/api/health', methods=['GET'])
+def api_health():
+    """
+    Endpoint de santé utilisé pour ping / préchauffer l'API
+    """
+    return jsonify({
+        "success": True,
+        "status": "ok",
+        "timestamp": datetime.utcnow().isoformat() + 'Z'
+    })
 
 @app.route('/api/compare', methods=['POST'])
 def compare_apps():
@@ -213,13 +232,142 @@ def load_licenses():
     Retourne une liste de licences ou une liste vide en cas d'erreur.
     """
     try:
-        license_file = os.getenv('LICENSE_FILE_PATH', 'licenses.json')
-        with open(license_file, 'r', encoding='utf-8') as f:
+        with open(LICENSE_FILE_PATH, 'r', encoding='utf-8') as f:
             data = json.load(f)
             return data.get('licenses', [])
     except Exception as e:
         logger.error(f"Error loading licenses: {str(e)}")
         return []
+
+
+def write_licenses(licenses):
+    """
+    Sauvegarde la liste des licences dans le fichier JSON
+    """
+    try:
+        with open(LICENSE_FILE_PATH, 'w', encoding='utf-8') as f:
+            json.dump({'licenses': licenses}, f, ensure_ascii=False, indent=2)
+        return True
+    except Exception as e:
+        logger.error(f"Error writing licenses: {str(e)}")
+        return False
+
+
+def generate_license_key():
+    """
+    Génère une clé du type PSAP-XXXX-XXXX-XXXX-XXXX en évitant les caractères ambigus
+    """
+    alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+    parts = [''.join(secrets.choice(alphabet) for _ in range(4)) for _ in range(4)]
+    return 'PSAP-' + '-'.join(parts)
+
+
+def get_or_create_license(email, plan='premium'):
+    """
+    Retourne une licence active pour l'email ou en crée une nouvelle
+    """
+    if not email:
+        return None, False
+
+    normalized_email = email.strip().lower()
+    licenses = load_licenses()
+
+    existing_license = next(
+        (lic for lic in licenses
+         if lic.get('email', '').lower() == normalized_email and lic.get('status') == 'active'),
+        None
+    )
+
+    if existing_license:
+        return existing_license, False
+
+    # Générer une nouvelle clé unique
+    existing_keys = {lic.get('key') for lic in licenses}
+    new_key = generate_license_key()
+    attempts = 0
+    while new_key in existing_keys and attempts < 10:
+        new_key = generate_license_key()
+        attempts += 1
+
+    license_entry = {
+        'key': new_key,
+        'email': normalized_email,
+        'created_at': datetime.utcnow().isoformat() + 'Z',
+        'expires_at': None,
+        'status': 'active',
+        'plan': plan,
+        'notes': 'Généré automatiquement via Stripe'
+    }
+
+    licenses.append(license_entry)
+    write_licenses(licenses)
+    return license_entry, True
+
+
+def send_license_email(email, license_key, plan='premium', amount=None, currency='EUR'):
+    """
+    Envoie la clé de licence par email via SendGrid
+    """
+    if not SENDGRID_API_KEY:
+        logger.warning('SENDGRID_API_KEY manquant : impossible d\'envoyer l’email de licence')
+        return False
+
+    try:
+        from sendgrid import SendGridAPIClient
+        from sendgrid.helpers.mail import Mail
+
+        price_line = ''
+        if amount:
+            price_line = f"<p><strong>Montant :</strong> {amount:.2f} {currency.upper()}</p>"
+
+        html_content = f"""
+            <p>Bonjour 👋</p>
+            <p>Merci d'avoir rejoint PlayStore Analytics Pro. Voici votre clé de licence {plan.title()} :</p>
+            <p style="font-size:18px;font-weight:bold;background:#f3f4f6;padding:12px 16px;border-radius:8px;font-family:monospace;">
+                {license_key}
+            </p>
+            {price_line}
+            <p>👉 Activez-la depuis la page premium : https://playstore-analytics.pro/premium.html</p>
+            <p>Une question ? hello@playstore-analytics.pro</p>
+            <p>Merci,<br>{SENDGRID_FROM_NAME}</p>
+        """
+
+        message = Mail(
+            from_email=(SENDGRID_FROM_EMAIL, SENDGRID_FROM_NAME),
+            to_emails=email,
+            subject='Votre clé PlayStore Analytics Pro',
+            html_content=html_content
+        )
+
+        sg = SendGridAPIClient(SENDGRID_API_KEY)
+        response = sg.send(message)
+        logger.info(f'SendGrid response: {response.status_code}')
+        return response.status_code in (200, 201, 202)
+
+    except Exception as e:
+        logger.error(f'Error sending license email: {str(e)}')
+        return False
+
+
+def deliver_license(email, plan='premium', amount=None, currency='EUR', force_email=False):
+    """
+    Crée (ou récupère) une licence et tente d'envoyer l'email associé
+    """
+    license_entry, created = get_or_create_license(email, plan=plan)
+    if not license_entry:
+        return None, False
+
+    if created or force_email:
+        send_license_email(
+            email=email,
+            license_key=license_entry['key'],
+            plan=plan,
+            amount=amount,
+            currency=currency
+        )
+
+    logger.info(f"License {'created' if created else 'reused'} for {email}")
+    return license_entry, created
 
 
 def is_license_expired(expires_at):
@@ -305,8 +453,9 @@ def create_checkout():
         import stripe
         stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
 
-        data = request.get_json()
+        data = request.get_json() or {}
         email = data.get('email', '')
+        plan = (data.get('plan') or 'premium').lower()
 
         # Créer une session Checkout
         checkout_session = stripe.checkout.Session.create(
@@ -329,6 +478,7 @@ def create_checkout():
             customer_email=email,
             metadata={
                 'product': 'premium_license',
+                'plan': plan,
                 'email': email
             }
         )
@@ -365,6 +515,19 @@ def get_checkout_status(session_id):
         if not customer_email and customer_details:
             customer_email = customer_details.get('email')
 
+        license_entry = None
+        license_created = False
+
+        if session.payment_status == 'paid' and customer_email:
+            metadata = session.get('metadata', {}) or {}
+            plan = metadata.get('plan', 'premium')
+            license_entry, license_created = deliver_license(
+                email=customer_email,
+                plan=plan,
+                amount=amount_total,
+                currency=currency
+            )
+
         return jsonify({
             'success': True,
             'session_id': session.id,
@@ -372,6 +535,8 @@ def get_checkout_status(session_id):
             'amount_total': amount_total,
             'currency': currency,
             'customer_email': customer_email,
+            'license_key': license_entry.get('key') if license_entry else None,
+            'license_created': license_created
         })
 
     except Exception as e:
@@ -406,9 +571,19 @@ def stripe_webhook():
             # Créer automatiquement une licence
             email = session.get('customer_email')
             if email:
-                # TODO: Implémenter la création automatique de licence
-                logger.info(f"Payment successful for {email}")
-                # Vous pouvez envoyer un email avec la clé de licence ici
+                metadata = session.get('metadata', {}) or {}
+                plan = metadata.get('plan', 'premium')
+                amount_total = (session.get('amount_total') or 0) / 100
+                currency = (session.get('currency') or 'eur').upper()
+                deliver_license(
+                    email,
+                    plan=plan,
+                    amount=amount_total,
+                    currency=currency,
+                    force_email=True
+                )
+            else:
+                logger.warning('Stripe session completed without customer_email')
 
         return jsonify({'success': True})
 
